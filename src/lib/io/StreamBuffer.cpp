@@ -24,7 +24,9 @@
 
 #include <cassert>
 
-const UInt32            StreamBuffer::kChunkSize = 4096;
+// Increased from 4KB to 16KB to reduce memory fragmentation
+// and improve throughput for network transfers
+const UInt32            StreamBuffer::kChunkSize = 16384;
 
 StreamBuffer::StreamBuffer() :
     m_size(0),

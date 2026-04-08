@@ -25,6 +25,7 @@
 
 #include <stdarg.h>
 #include <mutex>
+#include <ctime>
 
 #define CLOG (Log::getInstance())
 #define BYE "\nTry `%s --help' for more information."
@@ -138,6 +139,7 @@ private:
     OutputterList        m_alwaysOutputters;
     int                    m_maxNewlineLength;
     int                    m_maxPriority;
+    mutable struct tm     tmBuffer;  // Thread-safe time buffer
 };
 
 /*!

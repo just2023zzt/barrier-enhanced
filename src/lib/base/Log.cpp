@@ -167,12 +167,17 @@ Log::print(const char* file, int line, const char* fmt, ...)
     // do not prefix time and file for kPRINT (CLOG_PRINT)
     if (priority != kPRINT) {
 
-        struct tm *tm;
         char timestamp[50];
         time_t t;
         time(&t);
-        tm = localtime(&t);
-        sprintf(timestamp, "%04i-%02i-%02iT%02i:%02i:%02i", tm->tm_year + 1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+        struct tm* tm = localtime_r(&t, &tmBuffer);
+        if (tm == nullptr) {
+            memset(&tmBuffer, 0, sizeof(tmBuffer));
+            tm = &tmBuffer;
+        }
+        snprintf(timestamp, sizeof(timestamp), "%04i-%02i-%02iT%02i:%02i:%02i",
+                 tm->tm_year + 1900, tm->tm_mon+1, tm->tm_mday,
+                 tm->tm_hour, tm->tm_min, tm->tm_sec);
 
         // square brackets, spaces, comma and null terminator take about 10
         size_t size = 10;
@@ -187,9 +192,9 @@ Log::print(const char* file, int line, const char* fmt, ...)
         char* message = new char[size];
 
 #ifndef NDEBUG
-        sprintf(message, "[%s] %s: %s\n\t%s,%d", timestamp, g_priority[priority], buffer, file, line);
+        snprintf(message, size, "[%s] %s: %s\n\t%s,%d", timestamp, g_priority[priority], buffer, file, line);
 #else
-        sprintf(message, "[%s] %s: %s", timestamp, g_priority[priority], buffer);
+        snprintf(message, size, "[%s] %s: %s", timestamp, g_priority[priority], buffer);
 #endif
 
         output(priority, message);
