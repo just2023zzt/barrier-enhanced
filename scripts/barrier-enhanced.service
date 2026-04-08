@@ -1,0 +1,42 @@
+# Barrier Enhanced - Systemd Service
+# ================================
+# Copy this file to /etc/systemd/system/barrier-enhanced.service
+# Then run: sudo systemctl enable barrier-enhanced
+#            sudo systemctl start barrier-enhanced
+
+[Unit]
+Description=Barrier Enhanced KVM
+Documentation=https://github.com/just2023zzt/barrier-enhanced
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Path to barrier binaries (adjust if needed)
+Environment="PATH=/opt/barrier-enhanced/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="QT_QPA_PLATFORM=linuxfb"
+
+# Start barrier
+# For server: barriers -c /etc/barrier/barrier.conf
+# For client: barrierc -c /etc/barrier/barrier.conf
+ExecStart=/opt/barrier-enhanced/bin/barriers -c /etc/barrier/barrier.conf
+
+# Restart settings
+Restart=always
+RestartSec=5
+
+# User settings
+# User=barrier
+# Group=barrier
+
+# Performance settings
+IOSchedulingClass=best-effort
+CPUSchedulingPolicy=batch
+MemoryMax=200M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=barrier-enhanced
+
+[Install]
+WantedBy=multi-user.target

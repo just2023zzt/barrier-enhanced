@@ -1,0 +1,81 @@
+# Barrier Enhanced Configuration
+# =============================
+# This is an example configuration file for barrier-enhanced.
+# Copy this to ~/.config/barrier/barrier.conf and modify as needed.
+
+# ---------------------------------------------------
+# SERVER CONFIGURATION (Primary screen with keyboard)
+# ---------------------------------------------------
+# If this computer has the keyboard/mouse connected, use this config:
+
+section: screens
+    # Your server screen name (change to your hostname)
+    my-server:
+        # Your screen resolution
+        1920,1080,0,0
+
+        # Client screens (to the right of your screen)
+        # Format: hostname or IP:port,width,height,x,y
+        # client-pc:
+        #     192.168.1.100:24800,1920,1080,1920,0
+
+        # Options
+        localShortcutMode = true
+        lowLatencyMode = true
+        clipboardSharing = true
+
+end
+
+section: aliases
+    # client-pc:
+    #     client-pc.local
+end
+
+
+# ---------------------------------------------------
+# CLIENT CONFIGURATION (Secondary screen, no keyboard)
+# ---------------------------------------------------
+# If this computer is just a display without keyboard, use this config instead:
+
+# section: screens
+#     # Your client screen name
+#     my-client:
+#         # Server IP and port
+#         192.168.1.50:24800
+#
+#         # Options
+#         lowLatencyMode = true
+#         clipboardSharing = true
+#
+# end
+
+
+# ---------------------------------------------------
+# NETWORK SETTINGS
+# ---------------------------------------------------
+# Default port is 24800
+# Make sure firewall allows traffic on this port!
+#
+# Ubuntu/Debian:
+#   sudo ufw allow 24800/tcp
+#
+# Fedora/RHEL:
+#   sudo firewall-cmd --add-port=24800/tcp --permanent
+#   sudo firewall-cmd --reload
+
+
+# ---------------------------------------------------
+# TROUBLESHOOTING
+# ---------------------------------------------------
+# If mouse is laggy:
+#   1. Enable lowLatencyMode
+#   2. Check network latency (ping the other computer)
+#   3. Try wired connection instead of WiFi
+#
+# If shortcuts don't work:
+#   1. Enable localShortcutMode
+#   2. Make sure both computers have same keyboard layout
+#
+# View logs:
+#   Linux: journalctl -u barrier-enhanced -f
+#   macOS: ~/Library/Logs/barrier/
