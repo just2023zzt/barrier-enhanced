@@ -23,6 +23,7 @@
 #include "platform/XWindowsClipboardUTF8Converter.h"
 #include "platform/XWindowsClipboardHTMLConverter.h"
 #include "platform/XWindowsClipboardBMPConverter.h"
+#include "platform/XWindowsClipboardPNGConverter.h"
 #include "platform/XWindowsUtil.h"
 #include "mt/Thread.h"
 #include "arch/Arch.h"
@@ -87,6 +88,7 @@ XWindowsClipboard::XWindowsClipboard(IXWindowsImpl* impl, Display* display,
     m_converters.push_back(new XWindowsClipboardHTMLConverter(m_display,
                                 "application/x-moz-nativehtml"));
     m_converters.push_back(new XWindowsClipboardBMPConverter(m_display));
+    m_converters.push_back(new XWindowsClipboardPNGConverter(m_display));
     m_converters.push_back(new XWindowsClipboardUTF8Converter(m_display,
                                 "text/plain;charset=UTF-8"));
     m_converters.push_back(new XWindowsClipboardUTF8Converter(m_display,

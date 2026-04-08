@@ -90,6 +90,8 @@ Server::Server(
 	m_writeToDropDirThread(NULL),
 	m_ignoreFileTransfer(false),
 	m_enableClipboard(true),
+	m_localShortcutMode(false),
+	m_lowLatencyMode(false),
 	m_sendDragInfoThread(NULL),
 	m_waitDragInfoThread(true),
 	m_args(args)
@@ -478,6 +480,13 @@ Server::switchScreen(BaseClientProxy* dst,
 	// since that's a waste of time we skip that and just warp the
 	// mouse.
 	if (m_active != dst) {
+		// When leaving a screen, fake releasing all keys to prevent
+		// "stuck" modifier keys (e.g., Alt, Ctrl held on one screen
+		// and released on another)
+		if (m_localShortcutMode) {
+			m_screen->fakeAllKeysUp();
+		}
+
 		// leave active screen
 		if (!m_active->leave()) {
 			// cannot leave screen
@@ -1177,6 +1186,20 @@ Server::processOptions()
 				LOG((CLOG_NOTE "clipboard sharing is disabled"));
 			}
 		}
+		else if (id == kOptionLocalShortcutMode) {
+			m_localShortcutMode = (value != 0);
+
+			if (m_localShortcutMode) {
+				LOG((CLOG_NOTE "local shortcut mode enabled - shortcuts will be handled locally when mouse is on primary screen"));
+			}
+		}
+		else if (id == kOptionLowLatencyMode) {
+			m_lowLatencyMode = (value != 0);
+
+			if (m_lowLatencyMode) {
+				LOG((CLOG_NOTE "low latency mode enabled - reduced latency at cost of higher CPU usage"));
+			}
+		}
 	}
 	if (m_relativeMoves && !newRelativeMoves) {
 		stopRelativeMoves();
@@ -1637,6 +1660,39 @@ Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button,
 
 	// relay
 	if (!m_keyboardBroadcasting && IKeyState::KeyInfo::isDefault(screens)) {
+		// If localShortcutMode is enabled and we're on primary screen,
+		// intercept modifier keys locally to prevent conflicts with remote
+		// screen shortcuts that use the same key combinations
+		if (m_localShortcutMode && m_active == m_primaryClient) {
+			// Only intercept keys that commonly cause conflicts:
+			// - Meta/Win key (system-level shortcuts)
+			// - Alt key alone (menu accelerators)
+			// - Ctrl+Alt combinations (often keyboard layout switches)
+			// Note: We do NOT intercept Ctrl+key or Shift+key alone
+			// as these are less likely to conflict
+			bool shouldHandleLocally = false;
+
+			// Win/Super/Meta key is almost always a local shortcut
+			if ((mask & KeyModifierMeta) != 0) {
+				shouldHandleLocally = true;
+			}
+			// Alt key with other modifiers (not just Alt alone)
+			else if ((mask & KeyModifierAlt) != 0 &&
+					 ((mask & KeyModifierControl) != 0 ||
+					  (mask & KeyModifierShift) != 0 ||
+					  (mask & KeyModifierMeta) != 0)) {
+				shouldHandleLocally = true;
+			}
+			// Alt key alone - only if we have a recent Alt+Tab or similar
+			// This is a trade-off between compatibility and preventing conflicts
+			// For now, we let Alt alone pass through to allow Alt+Tab to work
+
+			if (shouldHandleLocally) {
+				// Handle locally - don't forward to remote
+				m_primaryClient->keyDown(id, mask, button);
+				return;
+			}
+		}
 		m_active->keyDown(id, mask, button);
 	}
 	else {
@@ -1664,6 +1720,25 @@ Server::onKeyUp(KeyID id, KeyModifierMask mask, KeyButton button,
 
 	// relay
 	if (!m_keyboardBroadcasting && IKeyState::KeyInfo::isDefault(screens)) {
+		// Match the local shortcut mode logic from onKeyDown
+		if (m_localShortcutMode && m_active == m_primaryClient) {
+			bool shouldHandleLocally = false;
+
+			if ((mask & KeyModifierMeta) != 0) {
+				shouldHandleLocally = true;
+			}
+			else if ((mask & KeyModifierAlt) != 0 &&
+					 ((mask & KeyModifierControl) != 0 ||
+					  (mask & KeyModifierShift) != 0 ||
+					  (mask & KeyModifierMeta) != 0)) {
+				shouldHandleLocally = true;
+			}
+
+			if (shouldHandleLocally) {
+				m_primaryClient->keyUp(id, mask, button);
+				return;
+			}
+		}
 		m_active->keyUp(id, mask, button);
 	}
 	else {

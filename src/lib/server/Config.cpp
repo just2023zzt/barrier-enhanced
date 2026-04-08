@@ -900,6 +900,14 @@ Config::readSectionScreens(ConfigReadContext& s)
 				addOption(screen, kOptionScreenPreserveFocus,
 					s.parseBoolean(value));
 			}
+			else if (name == "localShortcutMode") {
+				addOption(screen, kOptionLocalShortcutMode,
+					s.parseBoolean(value));
+			}
+			else if (name == "lowLatencyMode") {
+				addOption(screen, kOptionLowLatencyMode,
+					s.parseBoolean(value));
+			}
 			else {
 				// unknown argument
 				throw XConfigRead(s, "unknown argument \"%{1}\"", name);
@@ -1360,6 +1368,12 @@ Config::getOptionName(OptionID id)
 	if (id == kOptionClipboardSharing) {
 		return "clipboardSharing";
 	}
+	if (id == kOptionLocalShortcutMode) {
+		return "localShortcutMode";
+	}
+	if (id == kOptionLowLatencyMode) {
+		return "lowLatencyMode";
+	}
 	return NULL;
 }
 
@@ -1376,7 +1390,9 @@ std::string Config::getOptionValue(OptionID id, OptionValue value)
 		id == kOptionRelativeMouseMoves ||
 		id == kOptionWin32KeepForeground ||
 		id == kOptionScreenPreserveFocus ||
-		id == kOptionClipboardSharing) {
+		id == kOptionClipboardSharing ||
+		id == kOptionLocalShortcutMode ||
+		id == kOptionLowLatencyMode) {
 		return (value != 0) ? "true" : "false";
 	}
 	if (id == kOptionModifierMapForShift ||

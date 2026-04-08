@@ -33,7 +33,8 @@
 #include <cstdlib>
 #include <memory>
 
-static const std::size_t MAX_INPUT_BUFFER_SIZE = 1024 * 1024;
+// Increased from 1MB to 4MB for better throughput on large clipboard transfers
+static const std::size_t MAX_INPUT_BUFFER_SIZE = 4 * 1024 * 1024;
 
 TCPSocket::TCPSocket(IEventQueue* events, SocketMultiplexer* socketMultiplexer, IArchNetwork::EAddressFamily family) :
     IDataSocket(events),
@@ -330,7 +331,9 @@ TCPSocket::init()
 TCPSocket::EJobResult
 TCPSocket::doRead()
 {
-    UInt8 buffer[4096];
+    // Increased from 4096 to 65536 for better throughput on large transfers
+    // (e.g., clipboard images). This reduces syscall overhead.
+    UInt8 buffer[65536];
     memset(buffer, 0, sizeof(buffer));
     size_t bytesRead = 0;
 

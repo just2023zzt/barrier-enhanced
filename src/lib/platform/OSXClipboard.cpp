@@ -22,6 +22,7 @@
 #include "platform/OSXClipboardUTF16Converter.h"
 #include "platform/OSXClipboardTextConverter.h"
 #include "platform/OSXClipboardBMPConverter.h"
+#include "platform/OSXClipboardPNGConverter.h"
 #include "platform/OSXClipboardHTMLConverter.h"
 #include "base/Log.h"
 #include "arch/XArch.h"
@@ -36,6 +37,7 @@ OSXClipboard::OSXClipboard() :
 {
     m_converters.push_back(new OSXClipboardHTMLConverter);
     m_converters.push_back(new OSXClipboardBMPConverter);
+    m_converters.push_back(new OSXClipboardPNGConverter);
     m_converters.push_back(new OSXClipboardUTF16Converter);
     m_converters.push_back(new OSXClipboardTextConverter);
 
@@ -106,6 +108,9 @@ void OSXClipboard::add(EFormat format, const std::string& data)
     }
     else if (format == IClipboard::kHTML) {
         LOG((CLOG_DEBUG " format of data to be added to clipboard was kHTML"));
+    }
+    else if (format == IClipboard::kPNG) {
+        LOG((CLOG_DEBUG " format of data to be added to clipboard was kPNG"));
     }
 
     for (ConverterList::const_iterator index = m_converters.begin();

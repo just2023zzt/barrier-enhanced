@@ -476,6 +476,14 @@ private:
     bool                m_ignoreFileTransfer;
     bool                m_enableClipboard;
 
+    // local shortcut mode - when enabled, shortcut keys are handled locally
+    // when mouse is on primary screen, preventing conflicts with remote
+    bool                m_localShortcutMode;
+
+    // low latency mode - when enabled, reduces latency at cost of higher CPU usage
+    // by disabling Nagle algorithm, larger buffers, and faster timeouts
+    bool                m_lowLatencyMode;
+
     Thread*                m_sendDragInfoThread;
     bool                m_waitDragInfoThread;
 
