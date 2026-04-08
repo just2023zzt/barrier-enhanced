@@ -141,6 +141,7 @@ private:
     bool                detectXI2();
 #ifdef HAVE_XI2
     void                selectXIRawMotion();
+    void                handleXIRawButtonEvent(const XIRawButtonEvent* event) const;
 #endif
     void                selectEvents(Window) const;
     void                doSelectEvents(Window) const;

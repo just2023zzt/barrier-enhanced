@@ -1228,7 +1228,13 @@ XWindowsScreen::handleSystemEvent(const Event& event, void*)
             if (m_impl->XGetEventData(m_display, cookie) &&
 				cookie->type == GenericEvent &&
 				cookie->extension == xi_opcode) {
-			if (cookie->evtype == XI_RawMotion) {
+			if (cookie->evtype == XI_RawButtonPress || cookie->evtype == XI_RawButtonRelease) {
+				XIRawButtonEvent* btn = (XIRawButtonEvent*)cookie->data;
+				handleXIRawButtonEvent(btn);
+				m_impl->XFreeEventData(m_display, cookie);
+				return;
+			}
+			else if (cookie->evtype == XI_RawMotion) {
 				// Get current pointer's position
 				Window root, child;
 				XMotionEvent xmotion;
@@ -1945,8 +1951,9 @@ XWindowsScreen::updateButtons()
 		}
 	}
 
-	// allocate button array
-	m_buttons.resize(maxButton);
+	// allocate button array. add 1 because button IDs are 1-based
+	// (index 0 is unused, indices 1..maxButton store button mapping).
+	m_buttons.resize(maxButton + 1);
 
 	// fill in button array values.  m_buttons[i] is the physical
 	// button number for logical button i+1.
@@ -2074,16 +2081,58 @@ XWindowsScreen::detectXI2()
 void
 XWindowsScreen::selectXIRawMotion()
 {
+	// Allocate mask large enough for all XI event types (up to XI_GenericEvent = 35).
+	// XIMaskLen(XI_GenericEvent + 1) ensures coverage of all raw button and motion events.
 	XIEventMask mask;
-
-	mask.deviceid = XIAllDevices;
-	mask.mask_len = XIMaskLen(XI_RawMotion);
-	mask.mask = (unsigned char*)calloc(mask.mask_len, sizeof(char));
 	mask.deviceid = XIAllMasterDevices;
-	memset(mask.mask, 0, 2);
-    XISetMask(mask.mask, XI_RawKeyRelease);
+	mask.mask_len = XIMaskLen(XI_GenericEvent + 1);
+	mask.mask = (unsigned char*)calloc(mask.mask_len, sizeof(char));
+	if (mask.mask == NULL) {
+		LOG((CLOG_WARN "failed to allocate XI event mask"));
+		return;
+	}
+
+	XISetMask(mask.mask, XI_RawKeyRelease);
 	XISetMask(mask.mask, XI_RawMotion);
-    m_impl->XISelectEvents(m_display, DefaultRootWindow(m_display), &mask, 1);
+	XISetMask(mask.mask, XI_RawButtonPress);
+	XISetMask(mask.mask, XI_RawButtonRelease);
+	m_impl->XISelectEvents(m_display, DefaultRootWindow(m_display), &mask, 1);
 	free(mask.mask);
+}
+
+void
+XWindowsScreen::handleXIRawButtonEvent(const XIRawButtonEvent* const event) const
+{
+	// Convert XI_RawButton event to XButtonEvent-like structure for reuse.
+	// Use XQueryPointer for current modifier state, matching the established
+	// pattern used in the XI_RawMotion handler in this file.
+	XButtonEvent xbutton;
+	memset(&xbutton, 0, sizeof(xbutton));
+	xbutton.type       = (event->evtype == XI_RawButtonPress) ? ButtonPress : ButtonRelease;
+	xbutton.send_event  = False;
+	xbutton.display     = m_display;
+	xbutton.window      = m_window;
+	xbutton.root        = DefaultRootWindow(m_display);
+	xbutton.time        = event->time;
+	xbutton.button      = event->detail;
+
+	Window root, child;
+	unsigned int msk;
+	Status st = m_impl->XQueryPointer(
+		m_display, m_root,
+		&xbutton.root, &child,
+		&xbutton.x_root, &xbutton.y_root,
+		&xbutton.x, &xbutton.y,
+		&msk);
+	if (st) {
+		xbutton.state = msk;
+	}
+
+	if (event->evtype == XI_RawButtonPress) {
+		onMousePress(xbutton);
+	}
+	else {
+		onMouseRelease(xbutton);
+	}
 }
 #endif
