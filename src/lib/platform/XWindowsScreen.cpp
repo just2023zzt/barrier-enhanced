@@ -89,6 +89,7 @@ XWindowsScreen::XWindowsScreen(
 	m_xkb(false),
 	m_xi2detected(false),
 	m_xrandr(false),
+	m_lowLatencyMode(false),
 	m_events(events),
 	PlatformScreen(events)
 {
@@ -430,6 +431,10 @@ XWindowsScreen::setOptions(const OptionsList& options)
 		else if (options[i] == kOptionScreenPreserveFocus) {
 			m_preserveFocus = (options[i + 1] != 0);
 			LOG((CLOG_DEBUG1 "Preserve Focus = %s", m_preserveFocus ? "true" : "false"));
+		}
+		else if (options[i] == kOptionLowLatencyMode) {
+			m_lowLatencyMode = (options[i + 1] != 0);
+			LOG((CLOG_INFO "Low Latency Mode = %s", m_lowLatencyMode ? "true" : "false"));
 		}
 	}
 }
@@ -1965,6 +1970,11 @@ XWindowsScreen::grabMouseAndKeyboard()
 	// if we can't grab one after grabbing the other then ungrab
 	// and wait before retrying.  give up after s_timeout seconds.
 	static const double s_timeout = 1.0;
+	// In low latency mode, reduce sleep time for faster grab recovery
+	static const double kNormalSleep = 0.05;
+	static const double kLowLatencySleep = 0.005;  // 5ms instead of 50ms
+	double sleepTime = m_lowLatencyMode ? kLowLatencySleep : kNormalSleep;
+
 	int result;
 	Stopwatch timer;
 	do {
@@ -1975,7 +1985,7 @@ XWindowsScreen::grabMouseAndKeyboard()
 			assert(result != GrabNotViewable);
 			if (result != GrabSuccess) {
 				LOG((CLOG_DEBUG2 "waiting to grab keyboard"));
-				ARCH->sleep(0.05);
+				ARCH->sleep(sleepTime);
 				if (timer.getTime() >= s_timeout) {
 					LOG((CLOG_DEBUG2 "grab keyboard timed out"));
 					return false;
@@ -1993,7 +2003,7 @@ XWindowsScreen::grabMouseAndKeyboard()
 			// back off to avoid grab deadlock
             m_impl->XUngrabKeyboard(m_display, CurrentTime);
 			LOG((CLOG_DEBUG2 "ungrabbed keyboard, waiting to grab pointer"));
-			ARCH->sleep(0.05);
+			ARCH->sleep(sleepTime);
 			if (timer.getTime() >= s_timeout) {
 				LOG((CLOG_DEBUG2 "grab pointer timed out"));
 				return false;

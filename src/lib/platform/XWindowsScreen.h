@@ -251,6 +251,9 @@ private:
 
     bool                m_xi2detected;
 
+    // low latency mode - reduces sleep times and increases responsiveness
+    bool                m_lowLatencyMode;
+
     // XRandR extension stuff
     bool                m_xrandr;
     int                 m_xrandrEventBase;

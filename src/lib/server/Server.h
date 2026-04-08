@@ -484,6 +484,10 @@ private:
     // by disabling Nagle algorithm, larger buffers, and faster timeouts
     bool                m_lowLatencyMode;
 
+    // mouse motion batching for low latency mode
+    SInt32                m_motionAccumX;
+    SInt32                m_motionAccumY;
+
     Thread*                m_sendDragInfoThread;
     bool                m_waitDragInfoThread;
 

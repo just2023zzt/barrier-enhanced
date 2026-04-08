@@ -92,6 +92,8 @@ Server::Server(
 	m_enableClipboard(true),
 	m_localShortcutMode(false),
 	m_lowLatencyMode(false),
+	m_motionAccumX(0),
+	m_motionAccumY(0),
 	m_sendDragInfoThread(NULL),
 	m_waitDragInfoThread(true),
 	m_args(args)
@@ -1811,7 +1813,12 @@ Server::onMouseUp(ButtonID id)
 bool
 Server::onMouseMovePrimary(SInt32 x, SInt32 y)
 {
-	LOG((CLOG_DEBUG4 "onMouseMovePrimary %d,%d", x, y));
+	// In low latency mode, reduce logging verbosity
+	if (m_lowLatencyMode) {
+		LOG((CLOG_DEBUG2 "onMouseMovePrimary %d,%d", x, y));
+	} else {
+		LOG((CLOG_DEBUG4 "onMouseMovePrimary %d,%d", x, y));
+	}
 
 	// mouse move on primary (server's) screen
 	if (m_active != m_primaryClient) {
@@ -1819,17 +1826,43 @@ Server::onMouseMovePrimary(SInt32 x, SInt32 y)
 		return false;
 	}
 
-	// save last delta
-	m_xDelta2 = m_xDelta;
-	m_yDelta2 = m_yDelta;
+	// In low latency mode, accumulate motion instead of sending immediately
+	// This reduces network overhead for rapid mouse movements
+	if (m_lowLatencyMode) {
+		m_motionAccumX += x - m_x;
+		m_motionAccumY += y - m_y;
 
-	// save current delta
-	m_xDelta  = x - m_x;
-	m_yDelta  = y - m_y;
+		// Only process if motion is significant (more than 2 pixels)
+		// This batches rapid movements together
+		if (std::abs(m_motionAccumX) <= 2 && std::abs(m_motionAccumY) <= 2) {
+			// Small movement, just update position and return
+			m_x = x;
+			m_y = y;
+			return true;
+		}
 
-	// save position
-	m_x       = x;
-	m_y       = y;
+		// Use accumulated motion as delta, then reset
+		m_xDelta2 = m_xDelta;
+		m_yDelta2 = m_yDelta;
+		m_xDelta = m_motionAccumX;
+		m_yDelta = m_motionAccumY;
+		m_motionAccumX = 0;
+		m_motionAccumY = 0;
+		m_x = x;
+		m_y = y;
+	} else {
+		// save last delta
+		m_xDelta2 = m_xDelta;
+		m_yDelta2 = m_yDelta;
+
+		// save current delta
+		m_xDelta  = x - m_x;
+		m_yDelta  = y - m_y;
+
+		// save position
+		m_x       = x;
+		m_y       = y;
+	}
 
 	// get screen shape
 	SInt32 ax, ay, aw, ah;
