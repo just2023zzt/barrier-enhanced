@@ -1,0 +1,1 @@
+Extracted inline CSS stylesheet from MainWindow.cpp into a separate QSS resource file (res/styles/dark.qss) for better maintainability and future theme switching support.

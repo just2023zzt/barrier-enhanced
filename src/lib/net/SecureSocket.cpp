@@ -377,15 +377,15 @@ static thread_local barrier::fs::path g_verify_fingerprint_path;
 // by verifying identity at the TLS handshake level (not post-handshake).
 static int cert_verify_fingerprint_callback(X509_STORE_CTX* ctx, void*)
 {
-    // Get the peer certificate. Use the modern API on OpenSSL 1.1+.
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    X509* cert = X509_STORE_CTX_get0_cert(ctx);
-#else
-    // OpenSSL < 1.1.0 is EOL; accept the connection to maintain backward compat
-    // until 1.0.x support is formally dropped.
-    (void)ctx;
-    return 1;
+    // ENCRYPTED_AUTHENTICATED mode requires OpenSSL >= 1.1.0 for proper
+    // fingerprint verification. Fall through to reject below if too old.
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    LOG((CLOG_ERR "authenticated TLS requires OpenSSL >= 1.1.0 (found %s); refusing connection",
+         OPENSSL_VERSION_TEXT));
+    return 0;
 #endif
+
+    X509* cert = X509_STORE_CTX_get0_cert(ctx);
     if (cert == nullptr) {
         return 0;
     }
@@ -404,10 +404,10 @@ static int cert_verify_fingerprint_callback(X509_STORE_CTX* ctx, void*)
     db.read(g_verify_fingerprint_path);
 
     if (db.fingerprints().empty()) {
-        // No fingerprints configured: accept the connection.
-        // (Same behaviour as the old ignore-callback for backward compatibility
-        // when no fingerprint is configured.)
-        return 1;
+        // ENCRYPTED_AUTHENTICATED mode demands a fingerprint database.
+        // Refuse rather than silently accepting any certificate (MITM risk).
+        LOG((CLOG_ERR "no trusted fingerprints configured; rejecting unauthenticated connection"));
+        return 0;
     }
 
     // Check if the fingerprint matches any trusted fingerprint
@@ -453,12 +453,20 @@ SecureSocket::initContext(bool server)
     SSL_METHOD* m = const_cast<SSL_METHOD*>(method);
     m_ssl->m_context = SSL_CTX_new(m);
 
-    // drop SSLv3 support (TLSv1.0/1.1 dropped by min version below)
+    // Drop weak protocols. SSLv3 always, then TLSv1.0/1.1 if we lack the
+    // modern min-version API (OpenSSL < 1.1.1).
     SSL_CTX_set_options(m_ssl->m_context, SSL_OP_NO_SSLv3);
-
-    // enforce TLS 1.2 minimum (TLSv1.0 and TLSv1.1 are deprecated)
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    // Modern API: set floor at TLS 1.2
     SSL_CTX_set_min_proto_version(m_ssl->m_context, TLS1_2_VERSION);
+#else
+    // Legacy API: disable TLS 1.0 and 1.1 explicitly
+    SSL_CTX_set_options(m_ssl->m_context, SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+    // Warn if trying ENCRYPTED_AUTHENTICATED on EOL OpenSSL (see callback).
+    if (security_level_ == ConnectionSecurityLevel::ENCRYPTED_AUTHENTICATED) {
+        LOG((CLOG_WARN "ENCRYPTED_AUTHENTICATED mode requires OpenSSL >= 1.1.0; "
+             "fingerprint verification will be unavailable (found %s)", OPENSSL_VERSION_TEXT));
+    }
 #endif
 
     if (m_ssl->m_context == NULL) {

@@ -228,8 +228,10 @@ private:
     XWindowsScreenSaver*    m_screensaver;
     bool                m_screensaverNotify;
 
-    // logical to physical button mapping.  m_buttons[i] gives the
-    // physical button for logical button i+1.
+    // Maps physical button number (index) to logical button ID (value).
+    // Populated by updateButtons() but currently unused — button mapping
+    // is done via hardcoded switch in mapButtonFromX/mapButtonToX.
+    // Kept for potential future dynamic button mapping support.
     std::vector<unsigned char>    m_buttons;
 
     // true if global auto-repeat was enabled before we turned it off

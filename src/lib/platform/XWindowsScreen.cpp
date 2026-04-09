@@ -1230,9 +1230,15 @@ XWindowsScreen::handleSystemEvent(const Event& event, void*)
 				cookie->extension == xi_opcode) {
 			if (cookie->evtype == XI_RawButtonPress || cookie->evtype == XI_RawButtonRelease) {
 				XIRawButtonEvent* btn = (XIRawButtonEvent*)cookie->data;
-				handleXIRawButtonEvent(btn);
-				m_impl->XFreeEventData(m_display, cookie);
-				return;
+				// Only handle side buttons (8/9) via raw path. Regular buttons
+				// (1-7) are forwarded through the standard ButtonPress/Release
+				// path below, avoiding duplicate events in XI2 environments.
+				if (btn->detail == 8 || btn->detail == 9) {
+					handleXIRawButtonEvent(btn);
+					m_impl->XFreeEventData(m_display, cookie);
+					return;
+				}
+				// fall through to let standard event path handle this button
 			}
 			else if (cookie->evtype == XI_RawMotion) {
 				// Get current pointer's position
@@ -1955,8 +1961,7 @@ XWindowsScreen::updateButtons()
 	// (index 0 is unused, indices 1..maxButton store button mapping).
 	m_buttons.resize(maxButton + 1);
 
-	// fill in button array values.  m_buttons[i] is the physical
-	// button number for logical button i+1.
+	// fill in button array values: m_buttons[physical-1] = logical button ID
 	for (UInt32 i = 0; i < numButtons; ++i) {
 		m_buttons[i] = 0;
 	}

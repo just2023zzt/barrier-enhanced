@@ -133,7 +133,9 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
     // Apply modern dark theme from QSS resource file
     QFile styleFile(":/res/styles/dark.qss");
     if (styleFile.open(QFile::ReadOnly)) {
-        setStyleSheet(QLatin1String(styleFile.readAll()));
+        setStyleSheet(QString::fromUtf8(styleFile.readAll()));
+    } else {
+        qWarning() << "Failed to load stylesheet:" << styleFile.fileName();
     }
 
     createMenuBar();

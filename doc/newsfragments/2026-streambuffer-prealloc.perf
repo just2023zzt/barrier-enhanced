@@ -1,0 +1,1 @@
+Optimized StreamBuffer::write() by pre-allocating chunk capacity with reserve(kChunkSize) to reduce memory fragmentation and improve network transfer throughput.

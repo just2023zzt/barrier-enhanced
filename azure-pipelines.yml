@@ -24,10 +24,12 @@ jobs:
       inputs:
         filePath: azure-pipelines/download_install_bonjour_sdk_like.ps1
     - task: PowerShell@2
-      displayName: Install OpenSSL 1.1.1
-      inputs: |
-        # OpenSSL 1.1.1 is pre-installed on vs2022 image at C:\Program Files\OpenSSL.
-        # Ensure it's discoverable by CMake's find_package(OpenSSL).
+      displayName: Set OpenSSL root hint for CMake
+      inputs:
+        targetType: inline
+        script: |
+          $env:OPENSSL_ROOT_DIR = "C:\Program Files\OpenSSL"
+          Write-Host "OPENSSL_ROOT_DIR=$env:OPENSSL_ROOT_DIR"
     - task: UsePythonVersion@0
       displayName: Selecting Python Installer for QLI Installer
       inputs:
