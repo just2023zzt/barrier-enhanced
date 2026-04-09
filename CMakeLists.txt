@@ -313,6 +313,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     # Fall back to vendored OpenSSL 1.0.2 only if system package is unavailable.
     find_package(OpenSSL 1.1.1 QUIET)
     if (OpenSSL_FOUND)
+        include_directories(BEFORE SYSTEM ${OPENSSL_INCLUDE_DIR})
         set(OPENSSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
         message(STATUS "Using system OpenSSL: ${OPENSSL_VERSION}")
     else()

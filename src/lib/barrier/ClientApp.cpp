@@ -134,7 +134,8 @@ ClientApp::help()
            << "an IPv6 address is required when also specifying a port number and \n"
            << "optional otherwise. The default port number is " << kDefaultPort << ".\n";
 
-    LOG((CLOG_PRINT "%s", buffer.str().c_str()));
+    std::cout << buffer.str();
+    std::cout.flush();
 }
 
 const char*

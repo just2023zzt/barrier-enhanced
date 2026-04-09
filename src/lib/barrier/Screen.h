@@ -138,6 +138,7 @@ public:
     match the given modifier mask.
     */
     void                keyUp(KeyID id, KeyModifierMask, KeyButton);
+    void                fakeAllKeysUp();
 
     //! Notify of mouse press
     /*!

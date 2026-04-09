@@ -73,9 +73,9 @@ FileChunk::assemble(barrier::IStream* stream, String& dataReceived, size_t& expe
     // parse
     UInt8 mark = 0;
     String content;
-    static size_t receivedDataSize;
-    static double elapsedTime;
-    static Stopwatch stopwatch;
+    static thread_local size_t receivedDataSize = 0;
+    static thread_local double elapsedTime = 0;
+    static thread_local Stopwatch stopwatch;
 
     if (!ProtocolUtil::readf(stream, kMsgDFileTransfer + 4, &mark, &content)) {
         return kError;
