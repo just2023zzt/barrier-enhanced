@@ -86,7 +86,7 @@ DropHelper::writeToDir(const String& destination, DragFileList& fileList, String
              destination.c_str()));
 
         fileList.clear();
-        data.clear();
+        String().swap(data);
     }
     else {
         LOG((CLOG_ERR "drop file failed: drop target is empty"));
