@@ -1,0 +1,2 @@
+Replaced the certificate verification bypass with a fingerprint-based callback that
+validates the peer certificate during the TLS handshake, blocking MITM attacks.

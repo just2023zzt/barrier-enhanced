@@ -1,0 +1,3 @@
+Fixed extra mouse buttons (forward/back, buttons 8-9) not being forwarded
+on X11 servers that route input through the XInput2 extension.
+Also fixed an off-by-one array bounds issue in the button mapping code.

@@ -309,18 +309,29 @@ include_directories("${CMAKE_SOURCE_DIR}/ext/lodepng")
 # OpenSSL
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set (OPENSSL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/openssl/windows)
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set (OPENSSL_ROOT "${OPENSSL_ROOT}/x64")
+    # Prefer system OpenSSL 1.1.1+ (required for TLS 1.3 / CVE fixes).
+    # Fall back to vendored OpenSSL 1.0.2 only if system package is unavailable.
+    find_package(OpenSSL 1.1.1 QUIET)
+    if (OpenSSL_FOUND)
+        set(OPENSSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
+        message(STATUS "Using system OpenSSL: ${OPENSSL_VERSION}")
     else()
-        set (OPENSSL_ROOT "${OPENSSL_ROOT}/x86")
+        # WARNING: vendored OpenSSL 1.0.2 is EOL and has known CVEs.
+        # Install OpenSSL 1.1.1 via chocolatey: choco install openssl.light
+        # or via vcpkg: vcpkg install openssl-windows
+        message(WARNING "System OpenSSL 1.1.1 not found, falling back to vendored OpenSSL 1.0.2 (EOL — update recommended)")
+        set (OPENSSL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/openssl/windows)
+        if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set (OPENSSL_ROOT "${OPENSSL_ROOT}/x64")
+        else()
+            set (OPENSSL_ROOT "${OPENSSL_ROOT}/x86")
+        endif()
+        include_directories (BEFORE SYSTEM ${OPENSSL_ROOT}/include)
+        set (OPENSSL_LIBS
+            ${OPENSSL_ROOT}/lib/libeay32.lib
+            ${OPENSSL_ROOT}/lib/ssleay32.lib
+        )
     endif()
-
-    include_directories (BEFORE SYSTEM ${OPENSSL_ROOT}/include)
-    set (OPENSSL_LIBS
-        ${OPENSSL_ROOT}/lib/libeay32.lib
-        ${OPENSSL_ROOT}/lib/ssleay32.lib
-    )
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     find_program(APT_PROGRAM "apt")
     find_program(BREW_PROGRAM "brew")

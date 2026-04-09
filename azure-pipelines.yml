@@ -23,6 +23,11 @@ jobs:
       displayName: Download Bonjour SDK-like
       inputs:
         filePath: azure-pipelines/download_install_bonjour_sdk_like.ps1
+    - task: PowerShell@2
+      displayName: Install OpenSSL 1.1.1
+      inputs: |
+        # OpenSSL 1.1.1 is pre-installed on vs2022 image at C:\Program Files\OpenSSL.
+        # Ensure it's discoverable by CMake's find_package(OpenSSL).
     - task: UsePythonVersion@0
       displayName: Selecting Python Installer for QLI Installer
       inputs:
@@ -36,7 +41,7 @@ jobs:
     - powershell: Copy-Item azure-pipelines\build_env_tmpl.bat build_env.bat
       displayName: Layering Azure Pipeline's build_env.bat
     - script: |
-          call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\vsdevcmd" -arch=x64 && clean_build.bat
+          call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64 && clean_build.bat
       displayName: Clean Build
     - task: ArchiveFiles@2
       displayName: Archive Completed Build Directory
