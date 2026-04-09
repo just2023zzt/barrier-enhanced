@@ -1,0 +1,1 @@
+Fixed Qt version requirement to 5.12 to match Ubuntu 20.04 CI and added proper OpenSSL environment hint step in Azure Pipelines.

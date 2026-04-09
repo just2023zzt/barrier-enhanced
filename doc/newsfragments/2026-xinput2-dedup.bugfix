@@ -1,0 +1,1 @@
+Fixed XInput2 mouse handling: side buttons (8/9) now correctly forwarded via raw path without duplicate events; regular buttons (1-7) pass through the standard event path only.

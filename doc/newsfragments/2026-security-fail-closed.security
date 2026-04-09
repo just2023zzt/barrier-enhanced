@@ -1,0 +1,1 @@
+Fixed TLS certificate verification to fail-closed: authenticated mode now rejects connections when no fingerprint database is configured (prevents silent MITM acceptance). Also enforces TLS 1.2 minimum on OpenSSL 1.0.x via SSL_OP_NO_TLSv1 flags.
