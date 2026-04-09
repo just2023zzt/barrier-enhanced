@@ -169,6 +169,8 @@ public slots:
         void proofreadInfo();
         void windowStateChanged();
         void updateSSLFingerprint();
+        void refreshControlState();
+        void showControlCenter();
 
     private:
         QSettings& m_Settings;
@@ -206,6 +208,8 @@ private slots:
     void on_m_pComboServerList_currentIndexChanged(QString );
     void on_m_pButtonReload_clicked();
     void installBonjour();
+    void on_m_pCheckBoxEnableDragDrop_clicked(bool checked);
+    void on_m_pCheckBoxGameMode_clicked(bool checked);
 
 };
 

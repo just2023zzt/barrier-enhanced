@@ -102,6 +102,10 @@ class AppConfig: public QObject
 
         void setMinimizeToTray(bool b);
         bool getMinimizeToTray();
+        void setEnableDragDrop(bool b);
+        bool getEnableDragDrop() const;
+        void setGameMode(bool b);
+        bool getGameMode() const;
 
         void saveSettings();
 
@@ -139,6 +143,8 @@ protected:
         bool m_AutoHide;
         bool m_AutoStart;
         bool m_MinimizeToTray;
+        bool m_EnableDragDrop;
+        bool m_GameMode;
 
         static const char m_BarriersName[];
         static const char m_BarriercName[];

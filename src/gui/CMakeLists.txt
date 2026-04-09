@@ -136,9 +136,11 @@ target_compile_definitions (barrier PRIVATE -DBARRIER_VERSION_STAGE="${BARRIER_V
 target_compile_definitions (barrier PRIVATE -DBARRIER_REVISION="${BARRIER_REVISION}")
 
 if (WIN32)
-    include_directories ($ENV{BONJOUR_SDK_HOME}/Include)
+    file(TO_CMAKE_PATH "$ENV{BONJOUR_SDK_HOME}" BONJOUR_SDK_HOME)
+    string(STRIP "${BONJOUR_SDK_HOME}" BONJOUR_SDK_HOME)
+    include_directories ("${BONJOUR_SDK_HOME}/Include")
     find_library (DNSSD_LIB dnssd.lib
-                  HINTS ENV BONJOUR_SDK_HOME
+                  HINTS "${BONJOUR_SDK_HOME}"
                   PATH_SUFFIXES "Lib/x64")
     set_target_properties (barrier PROPERTIES LINK_FLAGS "/NODEFAULTLIB:LIBCMT")
     target_link_libraries (barrier ${DNSSD_LIB})

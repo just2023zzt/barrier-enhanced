@@ -50,6 +50,8 @@ SettingsDialog::SettingsDialog(QWidget* parent, AppConfig& config) :
     m_pCheckBoxAutoHide->setChecked(appConfig().getAutoHide());
     m_pCheckBoxAutoStart->setChecked(appConfig().getAutoStart());
     m_pCheckBoxMinimizeToTray->setChecked(appConfig().getMinimizeToTray());
+    m_pCheckBoxEnableDragDrop->setChecked(appConfig().getEnableDragDrop());
+    m_pCheckBoxGameMode->setChecked(appConfig().getGameMode());
     m_pCheckBoxEnableCrypto->setChecked(m_appConfig.getCryptoEnabled());
     checkbox_require_client_certificate->setChecked(m_appConfig.getRequireClientCertificate());
 
@@ -77,6 +79,8 @@ void SettingsDialog::accept()
     m_appConfig.setAutoHide(m_pCheckBoxAutoHide->isChecked());
     m_appConfig.setAutoStart(m_pCheckBoxAutoStart->isChecked());
     m_appConfig.setMinimizeToTray(m_pCheckBoxMinimizeToTray->isChecked());
+    m_appConfig.setEnableDragDrop(m_pCheckBoxEnableDragDrop->isChecked());
+    m_appConfig.setGameMode(m_pCheckBoxGameMode->isChecked());
     m_appConfig.saveSettings();
     QDialog::accept();
 }

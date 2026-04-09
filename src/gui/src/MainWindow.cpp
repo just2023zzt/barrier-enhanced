@@ -144,6 +144,8 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
 
     m_pLabelScreenName->setText(getScreenName());
     m_pLabelIpAddresses->setText(getIPAddresses());
+    m_pCheckBoxEnableDragDrop->setChecked(appConfig.getEnableDragDrop());
+    m_pCheckBoxGameMode->setChecked(appConfig.getGameMode());
 
 #if defined(Q_OS_WIN)
     // ipc must always be enabled, so that we can disable command when switching to desktop mode.
@@ -169,6 +171,7 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
     m_pComboServerList->hide();
     m_pLabelPadlock->hide();
     frame_fingerprint_details->hide();
+    refreshControlState();
 
     updateSSLFingerprint();
 
@@ -245,6 +248,7 @@ void MainWindow::createTrayIcon()
 
     m_pTrayIconMenu->addAction(m_pActionStartBarrier);
     m_pTrayIconMenu->addAction(m_pActionStopBarrier);
+    m_pTrayIconMenu->addAction(m_pActionSettings);
     m_pTrayIconMenu->addAction(m_pActionShowLog);
     m_pTrayIconMenu->addSeparator();
 
@@ -309,7 +313,8 @@ void MainWindow::loadSettings()
 void MainWindow::initConnections()
 {
     connect(m_pActionMinimize, SIGNAL(triggered()), this, SLOT(hide()));
-    connect(m_pActionRestore, SIGNAL(triggered()), this, SLOT(showNormal()));
+    connect(m_pActionRestore, SIGNAL(triggered()), this, SLOT(showControlCenter()));
+    connect(m_pButtonSettings, SIGNAL(clicked()), this, SLOT(on_m_pActionSettings_triggered()));
     connect(m_pActionStartBarrier, SIGNAL(triggered()), this, SLOT(startBarrier()));
     connect(m_pActionStopBarrier, SIGNAL(triggered()), this, SLOT(stopBarrier()));
     connect(m_pActionShowLog, SIGNAL(triggered()), this, SLOT(showLogWindow()));
@@ -325,6 +330,9 @@ void MainWindow::saveSettings()
     settings().setValue("useInternalConfig", m_pRadioInternalConfig->isChecked());
     settings().setValue("groupClientChecked", m_pGroupClient->isChecked());
     settings().setValue("serverHostname", m_pLineEditHostname->text());
+    appConfig().setEnableDragDrop(m_pCheckBoxEnableDragDrop->isChecked());
+    appConfig().setGameMode(m_pCheckBoxGameMode->isChecked());
+    appConfig().saveSettings();
 
     settings().sync();
 }
@@ -350,10 +358,16 @@ void MainWindow::trayActivated(QSystemTrayIcon::ActivationReason reason)
         }
         else
         {
-            showNormal();
-            activateWindow();
+            showControlCenter();
         }
     }
+}
+
+void MainWindow::showControlCenter()
+{
+    showNormal();
+    raise();
+    activateWindow();
 }
 
 void MainWindow::logOutput()
@@ -551,7 +565,7 @@ void MainWindow::startBarrier()
 
 #ifndef Q_OS_LINUX
 
-    if (m_ServerConfig.enableDragAndDrop()) {
+    if (appConfig().getEnableDragDrop()) {
         args << "--enable-drag-drop";
     }
 
@@ -738,6 +752,9 @@ bool MainWindow::serverArgs(QStringList& args, QString& app)
 
     if (!appConfig().getRequireClientCertificate()) {
         args << "--disable-client-cert-checking";
+    }
+    if (appConfig().getGameMode()) {
+        args << "--game-mode";
     }
 
     QString configFilename = this->configFilename();
@@ -1072,6 +1089,7 @@ void MainWindow::on_m_pGroupClient_toggled(bool on)
     if (on) {
         updateZeroconfService();
     }
+    refreshControlState();
 }
 
 void MainWindow::on_m_pGroupServer_toggled(bool on)
@@ -1080,6 +1098,7 @@ void MainWindow::on_m_pGroupServer_toggled(bool on)
     if (on) {
         updateZeroconfService();
     }
+    refreshControlState();
 }
 
 bool MainWindow::on_m_pButtonBrowseConfigFile_clicked()
@@ -1116,7 +1135,12 @@ void MainWindow::on_m_pActionAbout_triggered()
 void MainWindow::on_m_pActionSettings_triggered()
 {
     if (SettingsDialog(this, appConfig()).exec() == QDialog::Accepted)
+    {
+        m_pCheckBoxEnableDragDrop->setChecked(appConfig().getEnableDragDrop());
+        m_pCheckBoxGameMode->setChecked(appConfig().getGameMode());
+        refreshControlState();
         updateSSLFingerprint();
+    }
 }
 
 void MainWindow::autoAddScreen(const QString name)
@@ -1150,6 +1174,9 @@ void MainWindow::showConfigureServer(const QString& message)
     ServerConfigDialog dlg(this, serverConfig(), appConfig().screenName());
     dlg.message(message);
     dlg.exec();
+    m_pCheckBoxEnableDragDrop->setChecked(serverConfig().enableDragAndDrop());
+    appConfig().setEnableDragDrop(serverConfig().enableDragAndDrop());
+    appConfig().saveSettings();
 }
 
 void MainWindow::on_m_pButtonConfigureServer_clicked()
@@ -1373,6 +1400,27 @@ void MainWindow::windowStateChanged()
 {
     if (windowState() == Qt::WindowMinimized && appConfig().getMinimizeToTray())
         hide();
+}
+
+void MainWindow::refreshControlState()
+{
+    const bool serverMode = barrier_type() == BarrierType::Server;
+    m_pCheckBoxGameMode->setEnabled(serverMode);
+    m_pLabelFeatureHint->setText(serverMode
+        ? tr("Game mode is available because this machine is acting as the server. Drag & drop stays available for supported desktop targets.")
+        : tr("Client mode keeps quick connect and tray control active. Switch this machine to server mode to enable game mode."));
+}
+
+void MainWindow::on_m_pCheckBoxEnableDragDrop_clicked(bool checked)
+{
+    appConfig().setEnableDragDrop(checked);
+    appConfig().saveSettings();
+}
+
+void MainWindow::on_m_pCheckBoxGameMode_clicked(bool checked)
+{
+    appConfig().setGameMode(checked);
+    appConfig().saveSettings();
 }
 
 void MainWindow::showLogWindow()

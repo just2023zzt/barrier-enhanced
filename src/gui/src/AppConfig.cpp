@@ -61,7 +61,9 @@ AppConfig::AppConfig(QSettings* settings) :
     m_CryptoEnabled(false),
     m_AutoHide(false),
     m_AutoStart(false),
-    m_MinimizeToTray(false)
+    m_MinimizeToTray(false),
+    m_EnableDragDrop(true),
+    m_GameMode(false)
 {
     Q_ASSERT(m_pSettings);
 
@@ -163,6 +165,8 @@ void AppConfig::loadSettings()
     m_AutoHide = settings().value("autoHide", false).toBool();
     m_AutoStart = settings().value("autoStart", false).toBool();
     m_MinimizeToTray = settings().value("minimizeToTray", false).toBool();
+    m_EnableDragDrop = settings().value("enableDragDrop", true).toBool();
+    m_GameMode = settings().value("gameMode", false).toBool();
 }
 
 void AppConfig::saveSettings()
@@ -187,6 +191,8 @@ void AppConfig::saveSettings()
     settings().setValue("autoHide", m_AutoHide);
     settings().setValue("autoStart", m_AutoStart);
     settings().setValue("minimizeToTray", m_MinimizeToTray);
+    settings().setValue("enableDragDrop", m_EnableDragDrop);
+    settings().setValue("gameMode", m_GameMode);
     settings().sync();
 }
 
@@ -243,3 +249,11 @@ bool AppConfig::getAutoStart() { return m_AutoStart; }
 void AppConfig::setMinimizeToTray(bool b) { m_MinimizeToTray = b; }
 
 bool AppConfig::getMinimizeToTray() { return m_MinimizeToTray; }
+
+void AppConfig::setEnableDragDrop(bool b) { m_EnableDragDrop = b; }
+
+bool AppConfig::getEnableDragDrop() const { return m_EnableDragDrop; }
+
+void AppConfig::setGameMode(bool b) { m_GameMode = b; }
+
+bool AppConfig::getGameMode() const { return m_GameMode; }
