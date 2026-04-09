@@ -367,9 +367,59 @@ bool SecureSocket::load_certificates(const barrier::fs::path& path)
     return true;
 }
 
-static int cert_verify_ignore_callback(X509_STORE_CTX*, void*)
+// Thread-local fingerprint path for certificate verification.
+// Set by SecureSocket before handshake, read by the callback during TLS negotiation.
+// This replaces the previous cert_verify_ignore_callback which bypassed all verification.
+static thread_local barrier::fs::path g_verify_fingerprint_path;
+
+// Certificate verification callback: accepts only certificates whose fingerprint
+// matches the user-configured fingerprint database. This prevents MITM attacks
+// by verifying identity at the TLS handshake level (not post-handshake).
+static int cert_verify_fingerprint_callback(X509_STORE_CTX* ctx, void*)
 {
+    // Get the peer certificate. Use the modern API on OpenSSL 1.1+.
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    X509* cert = X509_STORE_CTX_get0_cert(ctx);
+#else
+    // OpenSSL < 1.1.0 is EOL; accept the connection to maintain backward compat
+    // until 1.0.x support is formally dropped.
+    (void)ctx;
     return 1;
+#endif
+    if (cert == nullptr) {
+        return 0;
+    }
+
+    // Compute SHA256 fingerprint of peer's certificate
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len = 0;
+    const EVP_MD* sha256 = EVP_sha256();
+    if (sha256 == nullptr || X509_digest(cert, sha256, hash, &hash_len) != 1) {
+        LOG((CLOG_ERR "failed to compute certificate fingerprint"));
+        return 0;
+    }
+
+    // Load and check against fingerprint database
+    barrier::FingerprintDatabase db;
+    db.read(g_verify_fingerprint_path);
+
+    if (db.fingerprints().empty()) {
+        // No fingerprints configured: accept the connection.
+        // (Same behaviour as the old ignore-callback for backward compatibility
+        // when no fingerprint is configured.)
+        return 1;
+    }
+
+    // Check if the fingerprint matches any trusted fingerprint
+    barrier::FingerprintData peer_fingerprint(hash, hash + hash_len);
+    for (const auto& fp : db.fingerprints()) {
+        if (peer_fingerprint == fp) {
+            return 1;  // Trusted
+        }
+    }
+
+    LOG((CLOG_ERR "peer certificate fingerprint does not match any trusted fingerprint"));
+    return 0;  // Not trusted — reject the connection during handshake
 }
 
 void
@@ -403,19 +453,25 @@ SecureSocket::initContext(bool server)
     SSL_METHOD* m = const_cast<SSL_METHOD*>(method);
     m_ssl->m_context = SSL_CTX_new(m);
 
-    // drop SSLv3 support
+    // drop SSLv3 support (TLSv1.0/1.1 dropped by min version below)
     SSL_CTX_set_options(m_ssl->m_context, SSL_OP_NO_SSLv3);
+
+    // enforce TLS 1.2 minimum (TLSv1.0 and TLSv1.1 are deprecated)
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    SSL_CTX_set_min_proto_version(m_ssl->m_context, TLS1_2_VERSION);
+#endif
 
     if (m_ssl->m_context == NULL) {
         showError("");
     }
 
     if (security_level_ == ConnectionSecurityLevel::ENCRYPTED_AUTHENTICATED) {
-        // We want to ask for peer certificate, but not verify it. If we don't ask for peer
-        // certificate, e.g. client won't send it.
+        // Request peer certificate and verify its fingerprint against the user's
+        // trusted fingerprint database. This prevents MITM while allowing self-signed
+        // certificates that the user has explicitly trusted.
         SSL_CTX_set_verify(m_ssl->m_context, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
                            nullptr);
-        SSL_CTX_set_cert_verify_callback(m_ssl->m_context, cert_verify_ignore_callback, nullptr);
+        SSL_CTX_set_cert_verify_callback(m_ssl->m_context, cert_verify_fingerprint_callback, nullptr);
     }
 }
 
@@ -436,6 +492,10 @@ int
 SecureSocket::secureAccept(int socket)
 {
     std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+
+    // Set the fingerprint path for cert_verify_fingerprint_callback, which runs
+    // during the TLS handshake below. This replaces the previous ignore-callback.
+    g_verify_fingerprint_path = barrier::DataDirectories::trusted_clients_ssl_fingerprints_path();
 
     createSSL();
 
@@ -510,6 +570,10 @@ SecureSocket::secureConnect(int socket)
     }
 
     std::lock_guard<std::mutex> ssl_lock{ssl_mutex_};
+
+    // Set the fingerprint path for cert_verify_fingerprint_callback, which runs
+    // during the TLS handshake below. This replaces the previous ignore-callback.
+    g_verify_fingerprint_path = barrier::DataDirectories::trusted_servers_ssl_fingerprints_path();
 
     createSSL();
 

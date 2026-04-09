@@ -10,7 +10,7 @@ jobs:
 - job: WinBuild
   displayName: Windows Build
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'vs2022'
   strategy:
     matrix:
       Debug:
@@ -65,10 +65,10 @@ jobs:
 - job: LinuxBuild
   strategy:
     matrix:
-      ubuntu-18.04:
-        imageName: 'ubuntu-18.04'
       ubuntu-20.04:
         imageName: 'ubuntu-20.04'
+      ubuntu-22.04:
+        imageName: 'ubuntu-22.04'
   displayName: Linux Build
   pool:
     vmImage: $(imageName)

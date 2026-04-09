@@ -71,6 +71,10 @@ int main(int argc, char* argv[])
 	QCoreApplication::setOrganizationDomain("github.com");
 	QCoreApplication::setApplicationName("Barrier");
 
+	// Enable High DPI scaling for modern displays
+	QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+
 	QBarrierApplication app(argc, argv);
 
 #if defined(Q_OS_MAC)
