@@ -144,6 +144,23 @@ if (WIN32)
                   PATH_SUFFIXES "Lib/x64")
     set_target_properties (barrier PROPERTIES LINK_FLAGS "/NODEFAULTLIB:LIBCMT")
     target_link_libraries (barrier ${DNSSD_LIB})
+
+    get_target_property(QT_QMAKE_EXECUTABLE Qt5::qmake IMPORTED_LOCATION)
+    if (QT_QMAKE_EXECUTABLE)
+        get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+        set(WINDEPLOYQT_EXECUTABLE "${QT_BIN_DIR}/windeployqt.exe")
+    endif()
+
+    add_custom_command(
+        TARGET barrier POST_BUILD
+        COMMAND "${CMAKE_COMMAND}"
+            -DWINDEPLOYQT_EXECUTABLE=${WINDEPLOYQT_EXECUTABLE}
+            -DOPENSSL_ROOT_HINT=${OPENSSL_ROOT_DIR}
+            -DOUTPUT_DIR=$<TARGET_FILE_DIR:barrier>
+            -DTARGET_FILE=$<TARGET_FILE:barrier>
+            -P "${CMAKE_CURRENT_LIST_DIR}/DeployWindowsGui.cmake"
+        VERBATIM
+    )
 elseif (APPLE)
     find_library(APPSERVICES_LIB ApplicationServices)
     target_link_libraries(barrier ${APPSERVICES_LIB})
