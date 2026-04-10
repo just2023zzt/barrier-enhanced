@@ -638,11 +638,8 @@ void MainWindow::startBarrier()
     }
 
 #if defined(Q_OS_WIN)
-    // on windows, the profile directory changes depending on the user that
-    // launched the process (e.g. when launched with elevation). setting the
-    // profile dir on launch ensures it uses the same profile dir is used
-    // no matter how its relaunched.
-    args << "--profile-dir" << QString::fromStdString("\"" + barrier::DataDirectories::profile().u8string() + "\"");
+    // QProcess passes arguments without shell parsing, so do not embed quotes.
+    args << "--profile-dir" << QString::fromStdString(barrier::DataDirectories::profile().u8string());
 #endif
 
     if ((barrier_type() == BarrierType::Client && !clientArgs(args, app))
@@ -686,7 +683,7 @@ void MainWindow::startBarrier()
 
     if (serviceMode)
     {
-        QString command(app + " " + args.join(" "));
+        QString command(QString("\"%1\" %2").arg(app, args.join(" ")));
         m_IpcClient.sendCommand(command, appConfig().elevateMode());
     }
 }
@@ -703,11 +700,6 @@ bool MainWindow::clientArgs(QStringList& args, QString& app)
         return false;
     }
 
-#if defined(Q_OS_WIN)
-    // wrap in quotes so a malicious user can't start \Program.exe as admin.
-    app = QString("\"%1\"").arg(app);
-#endif
-
     if (appConfig().logToFile())
     {
         appConfig().persistLogDir();
@@ -719,7 +711,7 @@ bool MainWindow::clientArgs(QStringList& args, QString& app)
     if (m_pCheckBoxAutoConfig->isChecked()) {
         if (m_pComboServerList->count() != 0) {
             QString serverIp = m_pComboServerList->currentText();
-            args << "[" + serverIp + "]:" + QString::number(appConfig().port());
+            args << QString("%1:%2").arg(serverIp, QString::number(appConfig().port()));
             return true;
         }
     } else if (m_pLineEditHostname->text().isEmpty()) {
@@ -731,7 +723,7 @@ bool MainWindow::clientArgs(QStringList& args, QString& app)
         return false;
     }
 
-    args << "[" + m_pLineEditHostname->text() + "]:" + QString::number(appConfig().port());
+    args << QString("%1:%2").arg(m_pLineEditHostname->text(), QString::number(appConfig().port()));
 
     return true;
 }
@@ -799,11 +791,6 @@ bool MainWindow::serverArgs(QStringList& args, QString& app)
                              tr("The executable for the barrier server does not exist."));
         return false;
     }
-
-#if defined(Q_OS_WIN)
-    // wrap in quotes so a malicious user can't start \Program.exe as admin.
-    app = QString("\"%1\"").arg(app);
-#endif
 
     if (appConfig().logToFile())
     {
@@ -875,7 +862,17 @@ void MainWindow::stopDesktop()
     if (barrierProcess()->isOpen()) {
         // try to shutdown child gracefully
         barrierProcess()->write(&ShutdownCh, 1);
-        barrierProcess()->waitForFinished(5000);
+        barrierProcess()->waitForFinished(1500);
+        if (barrierProcess()->state() != QProcess::NotRunning) {
+            appendLogInfo("desktop process did not stop gracefully; terminating it");
+            barrierProcess()->terminate();
+            barrierProcess()->waitForFinished(2000);
+        }
+        if (barrierProcess()->state() != QProcess::NotRunning) {
+            appendLogInfo("desktop process did not terminate; killing it");
+            barrierProcess()->kill();
+            barrierProcess()->waitForFinished(2000);
+        }
         barrierProcess()->close();
     }
 
