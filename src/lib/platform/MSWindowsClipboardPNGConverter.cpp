@@ -110,3 +110,9 @@ MSWindowsClipboardPNGConverter::toIClipboard(HANDLE data) const
 
     return result;
 }
+
+UINT
+MSWindowsClipboardPNGConverter::getStaticFormatId()
+{
+    return s_pngFormatId;
+}

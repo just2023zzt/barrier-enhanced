@@ -26,6 +26,7 @@
 #include "platform/MSWindowsClipboardFacade.h"
 #include "arch/win32/ArchMiscWindows.h"
 #include "base/Log.h"
+#include "ext/lodepng/lodepng.h"
 
 //
 // MSWindowsClipboard
@@ -155,6 +156,21 @@ MSWindowsClipboard::getTime() const
 bool
 MSWindowsClipboard::has(EFormat format) const
 {
+    // Special handling for PNG format: check for PNG first, then fallback to BMP
+    if (format == IClipboard::kPNG) {
+        // Check if PNG format is available
+        UINT pngFormat = MSWindowsClipboardPNGConverter::getStaticFormatId();
+        if (pngFormat != 0 && IsClipboardFormatAvailable(pngFormat)) {
+            return true;
+        }
+        // Fallback: check if BMP is available (most apps provide BMP instead of PNG)
+        if (IsClipboardFormatAvailable(CF_DIB)) {
+            return true;
+        }
+        return false;
+    }
+
+    // Original logic for other formats
     for (ConverterList::const_iterator index = m_converters.begin();
                                 index != m_converters.end(); ++index) {
         IMSWindowsClipboardConverter* converter = *index;
@@ -169,6 +185,51 @@ MSWindowsClipboard::has(EFormat format) const
 
 std::string MSWindowsClipboard::get(EFormat format) const
 {
+    // Special handling for PNG format: try PNG first, then fallback to BMP→PNG conversion
+    if (format == IClipboard::kPNG) {
+        // Find PNG converter
+        IMSWindowsClipboardConverter* pngConverter = nullptr;
+        for (ConverterList::const_iterator index = m_converters.begin();
+            index != m_converters.end(); ++index) {
+            if ((*index)->getFormat() == IClipboard::kPNG) {
+                pngConverter = *index;
+                break;
+            }
+        }
+
+        // Try PNG format first
+        UINT pngFormat = MSWindowsClipboardPNGConverter::getStaticFormatId();
+        if (pngFormat != 0) {
+            HANDLE pngData = GetClipboardData(pngFormat);
+            if (pngData != NULL && pngConverter != nullptr) {
+                std::string result = pngConverter->toIClipboard(pngData);
+                if (!result.empty()) {
+                    LOG((CLOG_DEBUG "Got PNG from clipboard directly"));
+                    return result;
+                }
+            }
+        }
+
+        // Fallback: convert BMP to PNG
+        HANDLE bmpData = GetClipboardData(CF_DIB);
+        if (bmpData != NULL) {
+            // Get bitmap data size
+            SIZE_T bmpSize = GlobalSize(bmpData);
+            LPVOID bmpPtr = GlobalLock(bmpData);
+            if (bmpPtr != NULL) {
+                std::string dibData(static_cast<const char*>(bmpPtr), bmpSize);
+                GlobalUnlock(bmpData);
+
+                LOG((CLOG_DEBUG "Converting BMP (%u bytes) to PNG", bmpSize));
+                return convertBMPToPNG(dibData);
+            }
+        }
+
+        LOG((CLOG_DEBUG "No PNG or BMP data available for PNG format"));
+        return {};
+    }
+
+    // Original logic for other formats
     // find the converter for the first clipboard format we can handle
     IMSWindowsClipboardConverter* converter = NULL;
     for (ConverterList::const_iterator index = m_converters.begin();
@@ -230,4 +291,95 @@ MSWindowsClipboard::getOwnershipFormat()
 
     // return the format
     return s_ownershipFormat;
+}
+
+//
+// Helper function to convert Windows BMP (DIB) data to PNG
+//
+static std::string convertBMPToPNG(const std::string& dibData)
+{
+    // DIB format: BITMAPINFOHEADER + pixel data
+    // Pixel data can be BI_RGB (no compression) or BI_RLE8/BI_RLE4
+
+    if (dibData.size() < 40) {
+        LOG((CLOG_WARN "DIB data too small for header"));
+        return {};
+    }
+
+    const UInt8* header = reinterpret_cast<const UInt8*>(dibData.data());
+
+    // Get dimensions (BITMAPINFOHEADER is 40 bytes)
+    UInt32 headerSize = *reinterpret_cast<const UInt32*>(header + 0);
+    if (headerSize != 40) {
+        LOG((CLOG_WARN "Unsupported DIB header size: %u", headerSize));
+        return {};
+    }
+
+    SInt32 width = *reinterpret_cast<const SInt32*>(header + 4);
+    SInt32 height = *reinterpret_cast<const SInt32*>(header + 8);
+    UInt16 bitCount = *reinterpret_cast<const UInt16*>(header + 14);
+    UInt32 compression = *reinterpret_cast<const UInt32*>(header + 16);
+
+    // Height can be negative for top-down DIB
+    bool topDown = (height < 0);
+    if (height < 0) {
+        height = -height;
+    }
+
+    // Only support uncompressed 24-bit or 32-bit DIB
+    if (compression != 0) {  // BI_RGB = 0
+        LOG((CLOG_WARN "Compressed DIB not supported"));
+        return {};
+    }
+
+    if (bitCount != 24 && bitCount != 32) {
+        LOG((CLOG_WARN "Unsupported DIB bit count: %u", bitCount));
+        return {};
+    }
+
+    UInt32 bytesPerPixel = bitCount / 8;
+    UInt32 rowSize = ((width * bitCount + 31) / 32) * 4;  // Row is aligned to 4 bytes
+    UInt32 expectedDataSize = 40 + rowSize * height;
+
+    if (dibData.size() < expectedDataSize) {
+        LOG((CLOG_WARN "DIB data size mismatch: expected %u, got %u", expectedDataSize, dibData.size()));
+        return {};
+    }
+
+    const UInt8* pixelData = header + 40;
+
+    // Convert to RGBA for lodepng
+    std::vector<unsigned char> rgba;
+    rgba.reserve(width * height * 4);
+
+    for (SInt32 y = 0; y < static_cast<SInt32>(height); ++y) {
+        SInt32 srcY = topDown ? y : (height - 1 - y);
+        const UInt8* row = pixelData + srcY * rowSize;
+
+        for (SInt32 x = 0; x < width; ++x) {
+            UInt32 offset = x * bytesPerPixel;
+
+            // DIB is usually BGR/BGRA format
+            unsigned char b = row[offset + 0];
+            unsigned char g = row[offset + 1];
+            unsigned char r = row[offset + 2];
+            unsigned char a = (bitCount == 32) ? row[offset + 3] : 255;
+
+            // Convert to RGBA for lodepng
+            rgba.push_back(r);
+            rgba.push_back(g);
+            rgba.push_back(b);
+            rgba.push_back(a);
+        }
+    }
+
+    // Encode to PNG
+    std::vector<unsigned char> png;
+    unsigned error = lodepng::encode(png, rgba, width, height, LCT_RGBA);
+    if (error) {
+        LOG((CLOG_ERR "PNG encoding failed: %s", lodepng_error_text(error)));
+        return {};
+    }
+
+    return std::string(reinterpret_cast<const char*>(png.data()), png.size());
 }

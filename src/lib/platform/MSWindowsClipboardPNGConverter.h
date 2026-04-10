@@ -30,4 +30,7 @@ public:
     virtual UINT getWin32Format() const;
     virtual HANDLE fromIClipboard(const std::string&) const;
     virtual std::string toIClipboard(HANDLE data) const;
+
+    // Static method to get the PNG format ID
+    static UINT getStaticFormatId();
 };
