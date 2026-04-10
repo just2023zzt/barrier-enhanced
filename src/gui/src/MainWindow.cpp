@@ -198,6 +198,9 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
 #elif defined(Q_OS_LINUX)
     resize(700, 530);
     setMinimumSize(700, 0);
+#elif defined(Q_OS_WIN)
+    resize(820, 620);
+    setMinimumSize(760, 540);
 #endif
 
     m_SuppressAutoConfigWarning = true;
@@ -411,6 +414,15 @@ void MainWindow::trayActivated(QSystemTrayIcon::ActivationReason reason)
 
 void MainWindow::showControlCenter()
 {
+    setWindowState(windowState() & ~Qt::WindowMinimized);
+    setMinimumSize(QSize(760, 540));
+    if (width() < minimumWidth() || height() < minimumHeight()) {
+        resize(qMax(width(), minimumWidth()), qMax(height(), minimumHeight()));
+    }
+
+    const QRect availableGeometry = QApplication::desktop()->availableGeometry(this);
+    move(availableGeometry.center() - rect().center());
+
     showNormal();
     raise();
     activateWindow();
@@ -1047,7 +1059,8 @@ void MainWindow::changeEvent(QEvent* event)
 bool MainWindow::event(QEvent* event)
 {
     if (event->type() == QEvent::LayoutRequest) {
-        setFixedSize(sizeHint());
+        const QSize preferredSize = sizeHint().expandedTo(minimumSize());
+        setFixedSize(preferredSize);
     }
     return QMainWindow::event(event);
 }
