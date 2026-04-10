@@ -21,12 +21,14 @@ set(GUI_COMMON_HEADER_FILES
 
 set(GUI_SOURCE_FILES
     src/AboutDialog.cpp
+    src/ActionBus.cpp
     src/ActionDialog.cpp
     src/AddClientDialog.cpp
     src/AppConfig.cpp
     src/BarrierLocale.cpp
     src/BaseConfig.cpp
     src/CommandProcess.cpp
+    src/CommandPaletteDialog.cpp
     src/DataDownloader.cpp
     src/DisplayIsValid.cpp
     src/FingerprintAcceptDialog.cpp
@@ -52,6 +54,8 @@ set(GUI_SOURCE_FILES
     src/SslCertificate.cpp
     src/TrashScreenWidget.cpp
     src/VersionChecker.cpp
+    src/WorkflowHubDialog.cpp
+    src/WorkflowStore.cpp
     src/ZeroconfBrowser.cpp
     src/ZeroconfRegister.cpp
     src/ZeroconfServer.cpp
@@ -61,12 +65,14 @@ set(GUI_SOURCE_FILES
 
 set(GUI_HEADER_FILES
     src/AboutDialog.h
+    src/ActionBus.h
     src/ActionDialog.h
     src/AddClientDialog.h
     src/AppConfig.h
     src/BarrierLocale.h
     src/BaseConfig.h
     src/CommandProcess.h
+    src/CommandPaletteDialog.h
     src/DataDownloader.h
     src/DisplayIsValid.h
     src/ElevateMode.h
@@ -93,6 +99,9 @@ set(GUI_HEADER_FILES
     src/SslCertificate.h
     src/TrashScreenWidget.h
     src/VersionChecker.h
+    src/WorkflowHubDialog.h
+    src/WorkflowStore.h
+    src/WorkflowTypes.h
     src/ZeroconfBrowser.h
     src/ZeroconfRecord.h
     src/ZeroconfRegister.h

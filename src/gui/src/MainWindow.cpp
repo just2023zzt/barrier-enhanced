@@ -27,10 +27,14 @@
 #include "DataDownloader.h"
 #include "CommandProcess.h"
 #include "FingerprintAcceptDialog.h"
+#include "ActionBus.h"
+#include "CommandPaletteDialog.h"
 #include "QUtility.h"
 #include "ProcessorArch.h"
 #include "SslCertificate.h"
 #include "ShutdownCh.h"
+#include "WorkflowHubDialog.h"
+#include "WorkflowStore.h"
 #include "base/String.h"
 #include "common/DataDirectories.h"
 #include "net/FingerprintDatabase.h"
@@ -46,6 +50,7 @@
 #include <QFileDialog>
 #include <QDesktopServices>
 #include <QDesktopWidget>
+#include <QClipboard>
 
 #if defined(Q_OS_MAC)
 #include <ApplicationServices/ApplicationServices.h>
@@ -118,7 +123,13 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
     m_SuppressEmptyServerWarning(false),
     m_ExpectedRunningState(kStopped),
     m_pSslCertificate(NULL),
-    m_pLogWindow(new LogWindow(nullptr))
+    m_pLogWindow(new LogWindow(nullptr)),
+    m_pWorkflowStore(NULL),
+    m_pActionBus(NULL),
+    m_pWorkflowHubDialog(NULL),
+    m_pCommandPaletteDialog(NULL),
+    m_pActionWorkflowHub(NULL),
+    m_pActionCommandPalette(NULL)
 {
     // explicitly unset DeleteOnClose so the window can be show and hidden
     // repeatedly until Barrier is finished
@@ -137,6 +148,31 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
     } else {
         qWarning() << "Failed to load stylesheet:" << styleFile.fileName();
     }
+
+    m_pWorkflowStore = new WorkflowStore(appConfig, this);
+    m_pWorkflowStore->attachClipboard(QApplication::clipboard());
+    m_pActionBus = new ActionBus(*m_pWorkflowStore, this);
+
+    m_pActionWorkflowHub = new QAction(tr("Workflow &Hub"), this);
+    m_pActionWorkflowHub->setToolTip(tr("Open clipboard history, task handoff, suggestions, and transfer receipts."));
+    m_pActionWorkflowHub->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_H));
+    m_pActionCommandPalette = new QAction(tr("Command &Palette"), this);
+    m_pActionCommandPalette->setToolTip(tr("Run lightweight workflow commands."));
+    m_pActionCommandPalette->setShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_P));
+    addAction(m_pActionCommandPalette);
+
+    connect(m_pWorkflowStore, &WorkflowStore::notificationRequested,
+            this, &MainWindow::handleWorkflowNotification);
+    connect(m_pWorkflowStore, &WorkflowStore::runtimeModeChanged,
+            this, &MainWindow::updateWorkflowIndicators);
+    connect(m_pWorkflowStore, &WorkflowStore::historyChanged,
+            this, &MainWindow::updateWorkflowIndicators);
+    connect(m_pWorkflowStore, &WorkflowStore::suggestionsChanged,
+            this, &MainWindow::updateWorkflowIndicators);
+    connect(m_pWorkflowStore, &WorkflowStore::receiptsChanged,
+            this, &MainWindow::updateWorkflowIndicators);
+    connect(m_pActionBus, &ActionBus::notificationRequested,
+            this, &MainWindow::handleWorkflowNotification);
 
     createMenuBar();
     loadSettings();
@@ -189,6 +225,8 @@ MainWindow::MainWindow(QSettings& settings, AppConfig& appConfig) :
 
     // resize window to smallest reasonable size
     resize(0, 0);
+    updateWorkflowPeerHint();
+    updateWorkflowIndicators();
 }
 
 MainWindow::~MainWindow()
@@ -251,6 +289,9 @@ void MainWindow::createTrayIcon()
     m_pTrayIconMenu->addAction(m_pActionSettings);
     m_pTrayIconMenu->addAction(m_pActionShowLog);
     m_pTrayIconMenu->addSeparator();
+    m_pTrayIconMenu->addAction(m_pActionWorkflowHub);
+    m_pTrayIconMenu->addAction(m_pActionCommandPalette);
+    m_pTrayIconMenu->addSeparator();
 
     m_pTrayIconMenu->addAction(m_pActionMinimize);
     m_pTrayIconMenu->addAction(m_pActionRestore);
@@ -286,6 +327,9 @@ void MainWindow::createMenuBar()
     m_pMenuBar->addAction(m_pMenuHelp->menuAction());
 
     m_pMenuBarrier->addAction(m_pActionShowLog);
+    m_pMenuBarrier->addAction(m_pActionWorkflowHub);
+    m_pMenuBarrier->addAction(m_pActionCommandPalette);
+    m_pMenuBarrier->addSeparator();
     m_pMenuBarrier->addAction(m_pActionSettings);
     m_pMenuBarrier->addAction(m_pActionMinimize);
     m_pMenuBarrier->addSeparator();
@@ -318,6 +362,8 @@ void MainWindow::initConnections()
     connect(m_pActionStartBarrier, SIGNAL(triggered()), this, SLOT(startBarrier()));
     connect(m_pActionStopBarrier, SIGNAL(triggered()), this, SLOT(stopBarrier()));
     connect(m_pActionShowLog, SIGNAL(triggered()), this, SLOT(showLogWindow()));
+    connect(m_pActionWorkflowHub, SIGNAL(triggered()), this, SLOT(showWorkflowHub()));
+    connect(m_pActionCommandPalette, SIGNAL(triggered()), this, SLOT(showCommandPalette()));
     connect(m_pActionQuit, SIGNAL(triggered()), qApp, SLOT(quit()));
 }
 
@@ -425,6 +471,9 @@ void MainWindow::updateFromLogLine(const QString &line)
     // TODO: this code makes Andrew cry
     checkConnected(line);
     checkFingerprint(line);
+    if (m_pWorkflowStore) {
+        m_pWorkflowStore->recordLogLine(line);
+    }
 }
 
 void MainWindow::checkConnected(const QString& line)
@@ -435,6 +484,7 @@ void MainWindow::checkConnected(const QString& line)
         line.contains("server status: active"))
     {
         setBarrierState(barrierConnected);
+        updateWorkflowPeerHint();
 
         if (!appConfig().startedBefore() && isVisible()) {
                 QMessageBox::information(
@@ -896,6 +946,8 @@ void MainWindow::setBarrierState(qBarrierState state)
     setIcon(state);
 
     m_BarrierState = state;
+    updateWorkflowPeerHint();
+    updateWorkflowIndicators();
 }
 
 void MainWindow::setVisible(bool visible)
@@ -1409,6 +1461,7 @@ void MainWindow::refreshControlState()
     m_pLabelFeatureHint->setText(serverMode
         ? tr("Game mode is available because this machine is acting as the server. Drag & drop stays available for supported desktop targets.")
         : tr("Client mode keeps quick connect and tray control active. Switch this machine to server mode to enable game mode."));
+    updateWorkflowPeerHint();
 }
 
 void MainWindow::on_m_pCheckBoxEnableDragDrop_clicked(bool checked)
@@ -1426,4 +1479,71 @@ void MainWindow::on_m_pCheckBoxGameMode_clicked(bool checked)
 void MainWindow::showLogWindow()
 {
     m_pLogWindow->show();
+}
+
+void MainWindow::showWorkflowHub()
+{
+    if (m_pWorkflowHubDialog == NULL) {
+        m_pWorkflowHubDialog = new WorkflowHubDialog(*m_pWorkflowStore, *m_pActionBus, this);
+    }
+
+    m_pWorkflowHubDialog->show();
+    m_pWorkflowHubDialog->raise();
+    m_pWorkflowHubDialog->activateWindow();
+}
+
+void MainWindow::showCommandPalette()
+{
+    if (m_pCommandPaletteDialog == NULL) {
+        m_pCommandPaletteDialog = new CommandPaletteDialog(*m_pWorkflowStore, *m_pActionBus, this);
+        connect(m_pCommandPaletteDialog, &CommandPaletteDialog::workflowHubRequested,
+                this, &MainWindow::showWorkflowHub);
+    }
+
+    m_pCommandPaletteDialog->show();
+    m_pCommandPaletteDialog->raise();
+    m_pCommandPaletteDialog->activateWindow();
+}
+
+void MainWindow::handleWorkflowNotification(const QString& title, const QString& body)
+{
+    if (m_pTrayIcon && m_pTrayIcon->isVisible()) {
+        m_pTrayIcon->showMessage(title, body, QSystemTrayIcon::Information, 3500);
+    }
+}
+
+void MainWindow::updateWorkflowIndicators()
+{
+    if (!m_pTrayIcon || !m_pWorkflowStore) {
+        return;
+    }
+
+    m_pTrayIcon->setToolTip(QStringLiteral("Barrier\nWorkflow %1\n%2 history item(s), %3 suggestion(s)")
+        .arg(m_pWorkflowStore->runtimeModeText())
+        .arg(m_pWorkflowStore->history().size())
+        .arg(m_pWorkflowStore->suggestions().size()));
+}
+
+void MainWindow::updateWorkflowPeerHint()
+{
+    if (!m_pWorkflowStore) {
+        return;
+    }
+
+    if (barrierState() == barrierDisconnected) {
+        m_pWorkflowStore->setPeerDeviceHint(QString());
+        return;
+    }
+
+    if (barrier_type() == BarrierType::Client && !hostname().isEmpty()) {
+        m_pWorkflowStore->setPeerDeviceHint(hostname());
+        return;
+    }
+
+    if (barrier_type() == BarrierType::Server) {
+        m_pWorkflowStore->setPeerDeviceHint(tr("remote client"));
+        return;
+    }
+
+    m_pWorkflowStore->setPeerDeviceHint(QString());
 }

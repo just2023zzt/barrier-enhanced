@@ -106,6 +106,15 @@ class AppConfig: public QObject
         bool getEnableDragDrop() const;
         void setGameMode(bool b);
         bool getGameMode() const;
+        void setWorkflowEnabled(bool b);
+        bool getWorkflowEnabled() const;
+        void setSuggestionsEnabled(bool b);
+        bool getSuggestionsEnabled() const;
+        void setWorkflowHistoryLimit(int value);
+        int getWorkflowHistoryLimit() const;
+        void setWorkflowDormantSeconds(int value);
+        int getWorkflowDormantSeconds() const;
+        QString workflowInboxDir() const;
 
         void saveSettings();
 
@@ -145,6 +154,10 @@ protected:
         bool m_MinimizeToTray;
         bool m_EnableDragDrop;
         bool m_GameMode;
+        bool m_WorkflowEnabled;
+        bool m_SuggestionsEnabled;
+        int m_WorkflowHistoryLimit;
+        int m_WorkflowDormantSeconds;
 
         static const char m_BarriersName[];
         static const char m_BarriercName[];

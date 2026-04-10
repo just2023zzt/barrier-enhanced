@@ -21,6 +21,7 @@
 
 #include <QtCore>
 #include <QtNetwork>
+#include <QStandardPaths>
 
 #if defined(Q_OS_WIN)
 const char AppConfig::m_BarriersName[] = "barriers.exe";
@@ -63,7 +64,11 @@ AppConfig::AppConfig(QSettings* settings) :
     m_AutoStart(false),
     m_MinimizeToTray(false),
     m_EnableDragDrop(true),
-    m_GameMode(false)
+    m_GameMode(false),
+    m_WorkflowEnabled(true),
+    m_SuggestionsEnabled(true),
+    m_WorkflowHistoryLimit(100),
+    m_WorkflowDormantSeconds(60)
 {
     Q_ASSERT(m_pSettings);
 
@@ -102,6 +107,18 @@ QString AppConfig::barrierProgramDir() const
 {
     // barrier binaries should be in the same dir.
     return QCoreApplication::applicationDirPath() + "/";
+}
+
+QString AppConfig::workflowInboxDir() const
+{
+    QString baseDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (baseDir.isEmpty()) {
+        baseDir = barrierProgramDir() + "workflow";
+    }
+
+    QDir dir(baseDir);
+    dir.mkpath("workflow/inbox");
+    return dir.filePath("workflow/inbox");
 }
 
 void AppConfig::persistLogDir()
@@ -167,6 +184,10 @@ void AppConfig::loadSettings()
     m_MinimizeToTray = settings().value("minimizeToTray", false).toBool();
     m_EnableDragDrop = settings().value("enableDragDrop", true).toBool();
     m_GameMode = settings().value("gameMode", false).toBool();
+    m_WorkflowEnabled = settings().value("workflowEnabled", true).toBool();
+    m_SuggestionsEnabled = settings().value("workflowSuggestionsEnabled", true).toBool();
+    m_WorkflowHistoryLimit = settings().value("workflowHistoryLimit", 100).toInt();
+    m_WorkflowDormantSeconds = settings().value("workflowDormantSeconds", 60).toInt();
 }
 
 void AppConfig::saveSettings()
@@ -193,6 +214,10 @@ void AppConfig::saveSettings()
     settings().setValue("minimizeToTray", m_MinimizeToTray);
     settings().setValue("enableDragDrop", m_EnableDragDrop);
     settings().setValue("gameMode", m_GameMode);
+    settings().setValue("workflowEnabled", m_WorkflowEnabled);
+    settings().setValue("workflowSuggestionsEnabled", m_SuggestionsEnabled);
+    settings().setValue("workflowHistoryLimit", m_WorkflowHistoryLimit);
+    settings().setValue("workflowDormantSeconds", m_WorkflowDormantSeconds);
     settings().sync();
 }
 
@@ -257,3 +282,19 @@ bool AppConfig::getEnableDragDrop() const { return m_EnableDragDrop; }
 void AppConfig::setGameMode(bool b) { m_GameMode = b; }
 
 bool AppConfig::getGameMode() const { return m_GameMode; }
+
+void AppConfig::setWorkflowEnabled(bool b) { m_WorkflowEnabled = b; }
+
+bool AppConfig::getWorkflowEnabled() const { return m_WorkflowEnabled; }
+
+void AppConfig::setSuggestionsEnabled(bool b) { m_SuggestionsEnabled = b; }
+
+bool AppConfig::getSuggestionsEnabled() const { return m_SuggestionsEnabled; }
+
+void AppConfig::setWorkflowHistoryLimit(int value) { m_WorkflowHistoryLimit = value; }
+
+int AppConfig::getWorkflowHistoryLimit() const { return m_WorkflowHistoryLimit; }
+
+void AppConfig::setWorkflowDormantSeconds(int value) { m_WorkflowDormantSeconds = value; }
+
+int AppConfig::getWorkflowDormantSeconds() const { return m_WorkflowDormantSeconds; }
