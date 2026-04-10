@@ -1060,7 +1060,9 @@ bool MainWindow::event(QEvent* event)
 {
     if (event->type() == QEvent::LayoutRequest) {
         const QSize preferredSize = sizeHint().expandedTo(minimumSize());
-        setFixedSize(preferredSize);
+        if (width() < preferredSize.width() || height() < preferredSize.height()) {
+            resize(qMax(width(), preferredSize.width()), qMax(height(), preferredSize.height()));
+        }
     }
     return QMainWindow::event(event);
 }
@@ -1199,7 +1201,14 @@ void MainWindow::on_m_pActionAbout_triggered()
 
 void MainWindow::on_m_pActionSettings_triggered()
 {
-    if (SettingsDialog(this, appConfig()).exec() == QDialog::Accepted)
+    showControlCenter();
+
+    SettingsDialog dialog(this, appConfig());
+    dialog.setWindowModality(Qt::ApplicationModal);
+    dialog.raise();
+    dialog.activateWindow();
+
+    if (dialog.exec() == QDialog::Accepted)
     {
         m_pCheckBoxEnableDragDrop->setChecked(appConfig().getEnableDragDrop());
         m_pCheckBoxGameMode->setChecked(appConfig().getGameMode());

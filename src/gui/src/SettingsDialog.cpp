@@ -36,7 +36,7 @@
 #include <QSpinBox>
 
 SettingsDialog::SettingsDialog(QWidget* parent, AppConfig& config) :
-    QDialog(parent, Qt::WindowTitleHint | Qt::WindowSystemMenuHint),
+    QDialog(parent, Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint),
     Ui::SettingsDialogBase(),
     m_appConfig(config),
     m_pCheckBoxWorkflowEnabled(new QCheckBox(tr("Enable lightweight workflow handoff"), this)),
