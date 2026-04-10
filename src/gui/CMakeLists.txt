@@ -164,6 +164,7 @@ if (WIN32)
         TARGET barrier POST_BUILD
         COMMAND "${CMAKE_COMMAND}"
             -DWINDEPLOYQT_EXECUTABLE=${WINDEPLOYQT_EXECUTABLE}
+            -DQT_BIN_DIR=${QT_BIN_DIR}
             -DOPENSSL_ROOT_HINT=${OPENSSL_ROOT_DIR}
             -DOUTPUT_DIR=$<TARGET_FILE_DIR:barrier>
             -DTARGET_FILE=$<TARGET_FILE:barrier>

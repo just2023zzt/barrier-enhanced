@@ -10,6 +10,8 @@ if (NOT DEFINED OUTPUT_DIR OR NOT IS_DIRECTORY "${OUTPUT_DIR}")
     message(FATAL_ERROR "OUTPUT_DIR is missing for GUI deployment")
 endif()
 
+set(QT_DEPLOYED FALSE)
+
 if (DEFINED WINDEPLOYQT_EXECUTABLE AND EXISTS "${WINDEPLOYQT_EXECUTABLE}")
     execute_process(
         COMMAND "${WINDEPLOYQT_EXECUTABLE}"
@@ -20,11 +22,47 @@ if (DEFINED WINDEPLOYQT_EXECUTABLE AND EXISTS "${WINDEPLOYQT_EXECUTABLE}")
             "${TARGET_FILE}"
         RESULT_VARIABLE deploy_result
     )
-    if (NOT deploy_result EQUAL 0)
-        message(FATAL_ERROR "windeployqt failed with exit code ${deploy_result}")
+    if (deploy_result EQUAL 0)
+        set(QT_DEPLOYED TRUE)
+    else()
+        message(WARNING "windeployqt failed with exit code ${deploy_result}; falling back to direct Qt runtime copy")
     endif()
 else()
-    message(WARNING "windeployqt was not found; skipping Qt runtime deployment")
+    message(WARNING "windeployqt was not found; falling back to direct Qt runtime copy")
+endif()
+
+if (NOT QT_DEPLOYED)
+    if (NOT DEFINED QT_BIN_DIR OR NOT IS_DIRECTORY "${QT_BIN_DIR}")
+        message(FATAL_ERROR "QT_BIN_DIR is missing; cannot deploy Qt runtime")
+    endif()
+
+    get_filename_component(QT_ROOT_DIR "${QT_BIN_DIR}" DIRECTORY)
+    set(QT_PLUGINS_DIR "${QT_ROOT_DIR}/plugins")
+
+    foreach(qt_dll IN ITEMS Qt5Core.dll Qt5Gui.dll Qt5Network.dll Qt5Svg.dll Qt5Widgets.dll Qt5WinExtras.dll)
+        if (EXISTS "${QT_BIN_DIR}/${qt_dll}")
+            file(COPY "${QT_BIN_DIR}/${qt_dll}" DESTINATION "${OUTPUT_DIR}")
+        else()
+            message(FATAL_ERROR "Required Qt runtime not found: ${QT_BIN_DIR}/${qt_dll}")
+        endif()
+    endforeach()
+
+    foreach(plugin_entry IN ITEMS
+            "platforms/qwindows.dll"
+            "styles/qwindowsvistastyle.dll"
+            "iconengines/qsvgicon.dll"
+            "imageformats/qico.dll"
+            "imageformats/qjpeg.dll"
+            "imageformats/qsvg.dll")
+        get_filename_component(plugin_dir "${plugin_entry}" DIRECTORY)
+        get_filename_component(plugin_name "${plugin_entry}" NAME)
+        if (EXISTS "${QT_PLUGINS_DIR}/${plugin_entry}")
+            file(MAKE_DIRECTORY "${OUTPUT_DIR}/${plugin_dir}")
+            file(COPY "${QT_PLUGINS_DIR}/${plugin_entry}" DESTINATION "${OUTPUT_DIR}/${plugin_dir}")
+        else()
+            message(WARNING "Optional Qt plugin not found: ${QT_PLUGINS_DIR}/${plugin_entry}")
+        endif()
+    endforeach()
 endif()
 
 if (DEFINED OPENSSL_ROOT_HINT AND OPENSSL_ROOT_HINT)
